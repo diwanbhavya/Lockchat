@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Shield, Lock, AlertTriangle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Shield, Lock, AlertTriangle, Bot } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
+import { useAuth } from "@/context/AuthContext";
 
 interface SecureChatProps {
   isAuthenticated?: boolean;
@@ -14,20 +15,80 @@ interface SecureChatProps {
   onLogout?: () => void;
 }
 
+// Simple AI responses based on user input
+const generateAIResponse = (message: string): string => {
+  const lowerMessage = message.toLowerCase();
+
+  if (lowerMessage.includes("password") && lowerMessage.includes("strong")) {
+    return "A strong password should be at least 12 characters long, include uppercase and lowercase letters, numbers, and special characters. Avoid using personal information or common words.";
+  }
+
+  if (lowerMessage.includes("password") && lowerMessage.includes("change")) {
+    return "You can change your password in the Settings section. Make sure to choose a strong password that you haven't used before.";
+  }
+
+  if (lowerMessage.includes("security") || lowerMessage.includes("secure")) {
+    return "Security is our top priority. We use end-to-end encryption for all messages and advanced password hashing techniques to protect your account.";
+  }
+
+  if (
+    lowerMessage.includes("hello") ||
+    lowerMessage.includes("hi") ||
+    lowerMessage.includes("hey")
+  ) {
+    return `Hello! I'm your AI security assistant. How can I help you today with password security or account protection?`;
+  }
+
+  if (lowerMessage.includes("help") || lowerMessage.includes("assist")) {
+    return "I can help you with password security, account protection tips, or answer questions about our security features. What would you like to know?";
+  }
+
+  if (lowerMessage.includes("thank")) {
+    return "You're welcome! If you have any more security questions, feel free to ask.";
+  }
+
+  // Default response
+  return "I'm your AI security assistant. I can provide information about password security, account protection, and our security features. How can I assist you today?";
+};
+
 const SecureChat = ({
   isAuthenticated = true,
   username = "User",
   onLogout = () => {},
 }: SecureChatProps) => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("general");
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([
+    {
+      id: "welcome-1",
+      senderId: "system",
+      senderName: "System",
+      senderAvatar: "https://api.dicebear.com/7.x/bottts/svg?seed=system",
+      content:
+        "Welcome to the secure chat. Your messages are end-to-end encrypted.",
+      timestamp: new Date(),
+      isCurrentUser: false,
+    },
+  ]);
+  const [aiMessages, setAiMessages] = useState<any[]>([
+    {
+      id: "ai-welcome",
+      senderId: "ai",
+      senderName: "AI Assistant",
+      senderAvatar: "https://api.dicebear.com/7.x/bottts/svg?seed=aibot",
+      content:
+        "Hello! I'm your AI security assistant. How can I help you today?",
+      timestamp: new Date(),
+      isCurrentUser: false,
+    },
+  ]);
 
   const handleSendMessage = (message: string) => {
     // In a real app, this would send the message to a backend
     const newMessage = {
       id: Date.now().toString(),
       senderId: "currentUser",
-      senderName: username,
+      senderName: user?.username || username,
       senderAvatar:
         "https://api.dicebear.com/7.x/avataaars/svg?seed=currentUser",
       content: message,
@@ -35,23 +96,42 @@ const SecureChat = ({
       isCurrentUser: true,
     };
 
-    setMessages((prev) => [...prev, newMessage]);
+    if (activeTab === "general") {
+      setMessages((prev) => [...prev, newMessage]);
 
-    // Simulate receiving a response after a short delay
-    setTimeout(() => {
-      const responseMessage = {
-        id: (Date.now() + 1).toString(),
-        senderId: "chatbot",
-        senderName: "Security Bot",
-        senderAvatar:
-          "https://api.dicebear.com/7.x/avataaars/svg?seed=securityBot",
-        content:
-          "Your message has been securely delivered. Remember to keep your password strong and never share it with anyone.",
-        timestamp: new Date(),
-        isCurrentUser: false,
-      };
-      setMessages((prev) => [...prev, responseMessage]);
-    }, 1000);
+      // Simulate receiving a response after a short delay
+      setTimeout(() => {
+        const responseMessage = {
+          id: (Date.now() + 1).toString(),
+          senderId: "chatbot",
+          senderName: "Security Bot",
+          senderAvatar:
+            "https://api.dicebear.com/7.x/avataaars/svg?seed=securityBot",
+          content:
+            "Your message has been securely delivered. Remember to keep your password strong and never share it with anyone.",
+          timestamp: new Date(),
+          isCurrentUser: false,
+        };
+        setMessages((prev) => [...prev, responseMessage]);
+      }, 1000);
+    } else if (activeTab === "ai") {
+      // Add user message to AI chat
+      setAiMessages((prev) => [...prev, newMessage]);
+
+      // Generate AI response
+      setTimeout(() => {
+        const aiResponse = {
+          id: `ai-${Date.now() + 1}`,
+          senderId: "ai",
+          senderName: "AI Assistant",
+          senderAvatar: "https://api.dicebear.com/7.x/bottts/svg?seed=aibot",
+          content: generateAIResponse(message),
+          timestamp: new Date(),
+          isCurrentUser: false,
+        };
+        setAiMessages((prev) => [...prev, aiResponse]);
+      }, 1000);
+    }
   };
 
   if (!isAuthenticated) {
@@ -104,6 +184,7 @@ const SecureChat = ({
           defaultValue="general"
           className="h-full flex flex-col"
           onValueChange={setActiveTab}
+          value={activeTab}
         >
           <div className="px-6 pt-2 border-b">
             <TabsList className="bg-transparent">
@@ -112,6 +193,12 @@ const SecureChat = ({
                 className="data-[state=active]:bg-background"
               >
                 General
+              </TabsTrigger>
+              <TabsTrigger
+                value="ai"
+                className="data-[state=active]:bg-background"
+              >
+                AI Assistant
               </TabsTrigger>
               <TabsTrigger
                 value="support"
@@ -146,6 +233,19 @@ const SecureChat = ({
             </TabsContent>
 
             <TabsContent
+              value="ai"
+              className="h-full flex flex-col m-0 p-0 data-[state=active]:flex"
+            >
+              <div className="flex-1 overflow-hidden">
+                <MessageList messages={aiMessages} className="h-full" />
+              </div>
+              <MessageInput
+                onSendMessage={handleSendMessage}
+                placeholder="Ask the AI assistant about security..."
+              />
+            </TabsContent>
+
+            <TabsContent
               value="support"
               className="h-full flex flex-col m-0 p-0 data-[state=active]:flex"
             >
@@ -169,7 +269,7 @@ const SecureChat = ({
               </div>
               <MessageInput
                 placeholder="Ask for support here..."
-                onSendMessage={(msg) => alert(`Support message: ${msg}`)}
+                onSendMessage={(msg) => handleSendMessage(msg)}
               />
             </TabsContent>
 
@@ -197,7 +297,7 @@ const SecureChat = ({
               </div>
               <MessageInput
                 placeholder="Ask security questions here..."
-                onSendMessage={(msg) => alert(`Security message: ${msg}`)}
+                onSendMessage={(msg) => handleSendMessage(msg)}
               />
             </TabsContent>
           </div>

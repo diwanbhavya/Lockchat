@@ -10,6 +10,7 @@ interface User {
   lastLogin?: Date;
   passwordStrength?: "weak" | "medium" | "strong";
   isVerified: boolean;
+  password?: string; // Added to store password for verification
 }
 
 interface LoginCredentials {
@@ -34,6 +35,7 @@ let users: User[] = [
     lastLogin: new Date(),
     passwordStrength: "strong",
     isVerified: true,
+    password: "password123",
   },
 ];
 
@@ -43,16 +45,7 @@ export const getAllUsers = (): User[] => {
 };
 
 // Current logged in user
-let currentUser: User | null = {
-  id: "1",
-  username: "demo_user",
-  email: "demo@example.com",
-  fullName: "Demo User",
-  avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=demo",
-  lastLogin: new Date(),
-  passwordStrength: "strong",
-  isVerified: true,
-};
+let currentUser: User | null = null;
 
 // Local storage keys
 const USER_KEY = "password_analyzer_user";
@@ -124,20 +117,18 @@ export const authService = {
   login: (credentials: LoginCredentials): Promise<User> => {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
-        // For demo purposes, always succeed with login
-        const user = users.find((u) => u.email === credentials.email) || {
-          id: Date.now().toString(),
-          username: credentials.email.split("@")[0],
-          email: credentials.email,
-          fullName: credentials.email.split("@")[0],
-          avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${credentials.email}`,
-          lastLogin: new Date(),
-          passwordStrength: "medium",
-          isVerified: true,
-        };
+        // Find user by email
+        const user = users.find((u) => u.email === credentials.email);
 
-        if (!users.some((u) => u.email === credentials.email)) {
-          users.push(user);
+        // Check if user exists and password matches
+        if (!user) {
+          return reject(
+            new Error("User not found. Please check your email or sign up."),
+          );
+        }
+
+        if (user.password !== credentials.password) {
+          return reject(new Error("Incorrect password. Please try again."));
         }
 
         // Update last login
@@ -146,7 +137,7 @@ export const authService = {
         saveToStorage();
 
         resolve({ ...user });
-      }, 500); // Reduced delay for better UX
+      }, 500);
     });
   },
 
@@ -170,6 +161,7 @@ export const authService = {
           lastLogin: new Date(),
           passwordStrength,
           isVerified: false, // Requires email verification
+          password: data.password, // Store password for verification
         };
 
         users.push(newUser);

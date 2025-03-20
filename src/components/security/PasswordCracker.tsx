@@ -1,5 +1,12 @@
-import React, { useState } from "react";
-import { Shield, AlertTriangle, Check, X, RefreshCw } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import {
+  Shield,
+  AlertTriangle,
+  Check,
+  X,
+  RefreshCw,
+  PieChart,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -26,6 +33,13 @@ interface PasswordCrackerProps {
   username?: string;
 }
 
+interface CrackResult {
+  wordlist: string;
+  cracked: boolean;
+  timeTaken: string;
+  attempts: number;
+}
+
 const PasswordCracker = ({
   userPassword = "password123",
   username = "user",
@@ -42,12 +56,25 @@ const PasswordCracker = ({
     method: string;
   } | null>(null);
   const [activeTab, setActiveTab] = useState("wordlist");
+  const [allResults, setAllResults] = useState<CrackResult[]>([]);
+  const [showPieChart, setShowPieChart] = useState(false);
 
-  // Simulate password cracking
-  const crackPassword = () => {
+  // Wordlists for testing
+  const wordlists = [
+    { id: "rockyou.txt", name: "rockyou.txt", size: 14344391 },
+    { id: "darkweb2017.txt", name: "darkweb2017.txt", size: 40593089 },
+    { id: "hibp.txt", name: "Have I Been Pwned", size: 550273337 },
+    { id: "custom.txt", name: "Custom Wordlist", size: 5000000 },
+  ];
+
+  // Simulate password cracking for a single wordlist
+  const crackPassword = (specificWordlist = wordlist) => {
     setIsCracking(true);
     setProgress(0);
-    setResult(null);
+
+    if (!result) {
+      setResult(null);
+    }
 
     // Simulate progress updates
     const interval = setInterval(() => {
@@ -57,478 +84,336 @@ const PasswordCracker = ({
       });
     }, 200);
 
+    // Determine if password would be crackable
+    const isWeak =
+      /^[a-z0-9]{1,8}$/.test(password) ||
+      password.toLowerCase().includes(username.toLowerCase()) ||
+      ["password", "123456", "qwerty", "admin"].some((weak) =>
+        password.toLowerCase().includes(weak),
+      );
+
     // Simulate cracking result after a delay
     setTimeout(() => {
       clearInterval(interval);
       setProgress(100);
-      setIsCracking(false);
 
-      // Determine if password would be crackable
-      const isWeak =
-        /^[a-z0-9]{1,8}$/.test(password) ||
-        password.toLowerCase().includes(username.toLowerCase()) ||
-        ["password", "123456", "qwerty", "admin"].some((weak) =>
-          password.toLowerCase().includes(weak),
-        );
-
-      setResult({
+      // Generate result for this wordlist
+      const currentResult = {
+        wordlist: specificWordlist,
         cracked: isWeak,
         timeTaken: isWeak
           ? `${Math.floor(Math.random() * 60) + 1} seconds`
           : "Timeout after 24 hours",
         attempts: isWeak ? Math.floor(Math.random() * 10000000) + 1 : 100000000,
-        method:
-          crackMethod === "wordlist"
-            ? `Dictionary (${wordlist})`
-            : "Brute Force",
-      });
+      };
+
+      // Add to all results
+      setAllResults((prev) => [...prev, currentResult]);
+
+      // If this is the last wordlist or we're only testing one, finish cracking
+      if (specificWordlist === wordlist || specificWordlist === "all") {
+        setIsCracking(false);
+        setResult({
+          cracked: isWeak,
+          timeTaken: isWeak
+            ? `${Math.floor(Math.random() * 60) + 1} seconds`
+            : "Timeout after 24 hours",
+          attempts: isWeak
+            ? Math.floor(Math.random() * 10000000) + 1
+            : 100000000,
+          method:
+            crackMethod === "wordlist"
+              ? `Dictionary (${specificWordlist})`
+              : "Brute Force",
+        });
+      }
     }, 3000);
   };
 
-  return (
-    <div className="w-full max-w-4xl mx-auto bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-xl shadow-xl">
-      <div className="flex items-center space-x-3 mb-6">
-        <div className="p-2 bg-indigo-600 rounded-lg">
-          <Shield className="h-6 w-6 text-white" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-bold text-white">
-            Password Security Analysis
-          </h2>
-          <p className="text-slate-300">
-            Test your password against common cracking methods
-          </p>
-        </div>
-      </div>
+  // Test against all wordlists
+  const crackWithAllWordlists = () => {
+    setAllResults([]);
+    setShowPieChart(false);
+    setIsCracking(true);
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1 bg-slate-800 border-slate-700 text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg text-indigo-300">
-              Password Input
-            </CardTitle>
-            <CardDescription className="text-slate-400">
-              Enter the password you want to test
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm text-slate-300">Password</label>
-              <Input
-                type="text"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white"
-                placeholder="Enter password to test"
-              />
+    // Start with the first wordlist
+    let currentIndex = 0;
+
+    const testNextWordlist = () => {
+      if (currentIndex < wordlists.length) {
+        const currentWordlist = wordlists[currentIndex].id;
+        crackPassword(currentWordlist);
+        currentIndex++;
+
+        // Schedule the next wordlist test
+        setTimeout(testNextWordlist, 3500);
+      } else {
+        // All wordlists tested
+        setIsCracking(false);
+        setShowPieChart(true);
+      }
+    };
+
+    // Start testing wordlists
+    testNextWordlist();
+  };
+
+  // Reset the cracker
+  const resetCracker = () => {
+    setPassword(userPassword);
+    setResult(null);
+    setProgress(0);
+    setAllResults([]);
+    setShowPieChart(false);
+  };
+
+  return (
+    <Card className="w-full bg-white shadow-lg">
+      <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="h-6 w-6" />
+            <CardTitle>Password Security Analyzer</CardTitle>
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 bg-white/10 hover:bg-white/20"
+            onClick={resetCracker}
+          >
+            <RefreshCw className="h-4 w-4 text-white" />
+          </Button>
+        </div>
+        <CardDescription className="text-white/80">
+          Test your password against common cracking methods
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent className="p-6">
+        <Tabs
+          defaultValue="wordlist"
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="wordlist">Dictionary Attack</TabsTrigger>
+            <TabsTrigger value="results">Results Analysis</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="wordlist" className="space-y-4 pt-4">
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Password to Test
+                </label>
+                <Input
+                  id="password"
+                  type="text"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1"
+                  placeholder="Enter password to test"
+                  disabled={isCracking}
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="wordlist"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Wordlist
+                </label>
+                <Select
+                  value={wordlist}
+                  onValueChange={setWordlist}
+                  disabled={isCracking}
+                >
+                  <SelectTrigger className="w-full mt-1">
+                    <SelectValue placeholder="Select wordlist" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {wordlists.map((list) => (
+                      <SelectItem key={list.id} value={list.id}>
+                        {list.name} ({(list.size / 1000000).toFixed(1)}M
+                        entries)
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="all">Test All Wordlists</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="pt-2">
+                {isCracking ? (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Cracking in progress...</span>
+                      <span>{Math.round(progress)}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => crackPassword()}
+                      className="bg-blue-600 hover:bg-blue-700"
+                      disabled={!password || isCracking}
+                    >
+                      Test Password
+                    </Button>
+                    <Button
+                      onClick={crackWithAllWordlists}
+                      variant="outline"
+                      className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                      disabled={!password || isCracking}
+                    >
+                      Test Against All Wordlists
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-2 bg-slate-700">
-                <TabsTrigger
-                  value="wordlist"
-                  className="data-[state=active]:bg-indigo-600"
-                >
-                  Dictionary
-                </TabsTrigger>
-                <TabsTrigger
-                  value="bruteforce"
-                  className="data-[state=active]:bg-indigo-600"
-                >
-                  Brute Force
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="wordlist" className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-300">Wordlist</label>
-                  <Select value={wordlist} onValueChange={setWordlist}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                      <SelectValue placeholder="Select wordlist" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-700 text-white">
-                      <SelectItem value="rockyou.txt">
-                        rockyou.txt (14 million)
-                      </SelectItem>
-                      <SelectItem value="darkweb2017.txt">
-                        darkweb2017.txt (40 million)
-                      </SelectItem>
-                      <SelectItem value="hibp.txt">
-                        Have I Been Pwned (550 million)
-                      </SelectItem>
-                      <SelectItem value="custom.txt">
-                        Custom Wordlist
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="pt-2">
-                  <Button
-                    onClick={() => {
-                      setCrackMethod("wordlist");
-                      crackPassword();
-                    }}
-                    disabled={isCracking || !password}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    {isCracking ? (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        Running Dictionary Attack...
-                      </>
-                    ) : (
-                      "Start Dictionary Attack"
-                    )}
-                  </Button>
-                </div>
-              </TabsContent>
-              <TabsContent value="bruteforce" className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <label className="text-sm text-slate-300">
-                      Character Set
-                    </label>
-                    <Badge
-                      variant="outline"
-                      className="bg-indigo-900/50 text-indigo-300 border-indigo-700"
-                    >
-                      94 characters
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="lowercase"
-                        checked
-                        className="rounded bg-slate-700"
-                      />
-                      <label
-                        htmlFor="lowercase"
-                        className="text-sm text-slate-300"
-                      >
-                        Lowercase (a-z)
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="uppercase"
-                        checked
-                        className="rounded bg-slate-700"
-                      />
-                      <label
-                        htmlFor="uppercase"
-                        className="text-sm text-slate-300"
-                      >
-                        Uppercase (A-Z)
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="numbers"
-                        checked
-                        className="rounded bg-slate-700"
-                      />
-                      <label
-                        htmlFor="numbers"
-                        className="text-sm text-slate-300"
-                      >
-                        Numbers (0-9)
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="special"
-                        checked
-                        className="rounded bg-slate-700"
-                      />
-                      <label
-                        htmlFor="special"
-                        className="text-sm text-slate-300"
-                      >
-                        Special (!@#$%)
-                      </label>
-                    </div>
-                  </div>
-                </div>
-                <div className="pt-2">
-                  <Button
-                    onClick={() => {
-                      setCrackMethod("bruteforce");
-                      crackPassword();
-                    }}
-                    disabled={isCracking || !password}
-                    className="w-full bg-indigo-600 hover:bg-indigo-700"
-                  >
-                    {isCracking ? (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        Running Brute Force...
-                      </>
-                    ) : (
-                      "Start Brute Force Attack"
-                    )}
-                  </Button>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2 bg-slate-800 border-slate-700 text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg text-indigo-300">
-              Cracking Simulation
-            </CardTitle>
-            <CardDescription className="text-slate-400">
-              Simulated results using hashcat techniques
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {isCracking && (
-              <div className="space-y-4">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-300">
-                    Cracking in progress...
-                  </span>
-                  <span className="text-indigo-300">
-                    {Math.round(progress)}%
-                  </span>
-                </div>
-                <Progress value={progress} className="h-2 bg-slate-700" />
-                <div className="bg-slate-700 p-4 rounded-md font-mono text-xs text-green-400 h-32 overflow-auto">
-                  <div>
-                    $ hashcat -m 0 -a {crackMethod === "wordlist" ? 0 : 3}{" "}
-                    hash.txt{" "}
-                    {crackMethod === "wordlist" ? wordlist : "?a?a?a?a?a?a?a?a"}
-                  </div>
-                  <div>Initializing hashcat v6.2.5...</div>
-                  <div>
-                    * Device #1: NVIDIA GeForce RTX 3080, 10240/10240 MB, 68MCU
-                  </div>
-                  <div>
-                    * Device #2: NVIDIA GeForce RTX 3080, 10240/10240 MB, 68MCU
-                  </div>
-                  <div>Dictionary cache built:</div>
-                  <div>* Filename..: {wordlist}</div>
-                  <div>
-                    * Passwords.:{" "}
-                    {wordlist === "rockyou.txt"
-                      ? "14,344,391"
-                      : wordlist === "darkweb2017.txt"
-                        ? "40,593,089"
-                        : "550,273,337"}
-                  </div>
-                  <div>* Bytes.....: 139,921,497</div>
-                  <div>
-                    * Keyspace..:{" "}
-                    {wordlist === "rockyou.txt"
-                      ? "14,344,391"
-                      : wordlist === "darkweb2017.txt"
-                        ? "40,593,089"
-                        : "550,273,337"}
-                  </div>
-                  <div>Session..........: hashcat</div>
-                  <div>Status...........: Running</div>
-                  <div>Hash.Mode........: 0 (MD5)</div>
-                  <div>Hash.Target......: 5f4dcc3b5aa765d61d8327deb882cf99</div>
-                  <div>
-                    Speed.#1.........:{" "}
-                    {Math.floor(Math.random() * 10000) + 5000} MH/s (88.24ms) @
-                    Accel:64 Loops:32 Thr:1024 Vec:1
-                  </div>
-                  <div>
-                    Speed.#2.........:{" "}
-                    {Math.floor(Math.random() * 10000) + 5000} MH/s (88.24ms) @
-                    Accel:64 Loops:32 Thr:1024 Vec:1
-                  </div>
-                  <div>
-                    Speed.#*.........:{" "}
-                    {Math.floor(Math.random() * 20000) + 10000} MH/s
-                  </div>
-                  <div>Recovered........: 0/1 (0.00%) Digests</div>
-                  <div>
-                    Progress.........: {Math.floor(progress * 10000)}/
-                    {wordlist === "rockyou.txt"
-                      ? "14,344,391"
-                      : wordlist === "darkweb2017.txt"
-                        ? "40,593,089"
-                        : "550,273,337"}{" "}
-                    (0.00%)
-                  </div>
-                  <div>
-                    Time.Started.....: {new Date().toLocaleTimeString()}
-                  </div>
-                  <div>Time.Estimated..: Unknown</div>
-                </div>
-              </div>
-            )}
-
             {result && (
-              <div className="space-y-6">
-                <div
-                  className={`flex items-center p-4 ${result.cracked ? "bg-red-900/30" : "bg-green-900/30"} rounded-lg border ${result.cracked ? "border-red-700" : "border-green-700"}`}
-                >
-                  <div
-                    className={`p-2 rounded-full ${result.cracked ? "bg-red-600" : "bg-green-600"} mr-4`}
-                  >
-                    {result.cracked ? (
-                      <X className="h-6 w-6 text-white" />
-                    ) : (
-                      <Check className="h-6 w-6 text-white" />
-                    )}
-                  </div>
+              <div
+                className={`mt-4 rounded-lg p-4 ${result.cracked ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"}`}
+              >
+                <div className="flex items-start gap-3">
+                  {result.cracked ? (
+                    <AlertTriangle className="h-5 w-5 text-red-500 mt-0.5" />
+                  ) : (
+                    <Check className="h-5 w-5 text-green-500 mt-0.5" />
+                  )}
                   <div>
-                    <h3 className="text-lg font-medium text-white">
+                    <h3
+                      className={`font-medium ${result.cracked ? "text-red-700" : "text-green-700"}`}
+                    >
                       {result.cracked
-                        ? "Password Cracked!"
-                        : "Password Resistant to Cracking"}
+                        ? "Password Vulnerable!"
+                        : "Password Secure"}
                     </h3>
                     <p
-                      className={`text-sm ${result.cracked ? "text-red-300" : "text-green-300"}`}
+                      className={`text-sm ${result.cracked ? "text-red-600" : "text-green-600"}`}
                     >
                       {result.cracked
-                        ? "This password was successfully cracked and is considered insecure."
-                        : "This password resisted the cracking attempt and is considered strong."}
+                        ? `Your password was cracked in ${result.timeTaken} using ${result.method}.`
+                        : `Your password resisted cracking attempts using ${result.method}.`}
                     </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-700 p-4 rounded-md">
-                    <h4 className="text-sm font-medium text-slate-300 mb-1">
-                      Method Used
-                    </h4>
-                    <p className="text-indigo-300 font-medium">
-                      {result.method}
-                    </p>
-                  </div>
-                  <div className="bg-slate-700 p-4 rounded-md">
-                    <h4 className="text-sm font-medium text-slate-300 mb-1">
-                      Time to Crack
-                    </h4>
-                    <p
-                      className={`font-medium ${result.cracked ? "text-red-400" : "text-green-400"}`}
-                    >
-                      {result.timeTaken}
-                    </p>
-                  </div>
-                  <div className="bg-slate-700 p-4 rounded-md">
-                    <h4 className="text-sm font-medium text-slate-300 mb-1">
-                      Attempts
-                    </h4>
-                    <p className="text-white font-medium">
-                      {result.attempts.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="bg-slate-700 p-4 rounded-md">
-                    <h4 className="text-sm font-medium text-slate-300 mb-1">
-                      Security Rating
-                    </h4>
-                    <div className="flex items-center">
-                      {result.cracked ? (
-                        <Badge className="bg-red-600 hover:bg-red-700">
-                          Weak
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-green-600 hover:bg-green-700">
-                          Strong
-                        </Badge>
-                      )}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Badge
+                        variant="outline"
+                        className={`${result.cracked ? "border-red-200 text-red-700 bg-red-50" : "border-green-200 text-green-700 bg-green-50"}`}
+                      >
+                        {result.attempts.toLocaleString()} attempts
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={`${result.cracked ? "border-red-200 text-red-700 bg-red-50" : "border-green-200 text-green-700 bg-green-50"}`}
+                      >
+                        {result.timeTaken}
+                      </Badge>
                     </div>
                   </div>
                 </div>
-
-                <div className="bg-slate-700 p-4 rounded-md">
-                  <h4 className="text-sm font-medium text-slate-300 mb-3">
-                    Recommendations
-                  </h4>
-                  {result.cracked ? (
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex items-start">
-                        <AlertTriangle className="h-4 w-4 text-red-400 mr-2 mt-0.5" />
-                        <span className="text-slate-300">
-                          Use a longer password with at least 12 characters
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <AlertTriangle className="h-4 w-4 text-red-400 mr-2 mt-0.5" />
-                        <span className="text-slate-300">
-                          Include uppercase letters, numbers, and special
-                          characters
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <AlertTriangle className="h-4 w-4 text-red-400 mr-2 mt-0.5" />
-                        <span className="text-slate-300">
-                          Avoid using common words or patterns
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <AlertTriangle className="h-4 w-4 text-red-400 mr-2 mt-0.5" />
-                        <span className="text-slate-300">
-                          Don't use personal information in your password
-                        </span>
-                      </li>
-                    </ul>
-                  ) : (
-                    <ul className="space-y-2 text-sm">
-                      <li className="flex items-start">
-                        <Check className="h-4 w-4 text-green-400 mr-2 mt-0.5" />
-                        <span className="text-slate-300">
-                          Your password is strong against common cracking
-                          methods
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <Check className="h-4 w-4 text-green-400 mr-2 mt-0.5" />
-                        <span className="text-slate-300">
-                          Consider using a password manager for all your
-                          accounts
-                        </span>
-                      </li>
-                      <li className="flex items-start">
-                        <Check className="h-4 w-4 text-green-400 mr-2 mt-0.5" />
-                        <span className="text-slate-300">
-                          Enable two-factor authentication for additional
-                          security
-                        </span>
-                      </li>
-                    </ul>
-                  )}
-                </div>
               </div>
             )}
+          </TabsContent>
 
-            {!isCracking && !result && (
-              <div className="flex flex-col items-center justify-center h-64 text-center">
-                <Shield className="h-12 w-12 text-indigo-400 mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">
-                  Password Security Analyzer
-                </h3>
-                <p className="text-slate-400 max-w-md">
-                  Select a cracking method and start the simulation to see how
-                  your password would perform against real-world cracking
-                  attempts.
+          <TabsContent value="results" className="space-y-4 pt-4">
+            {allResults.length > 0 ? (
+              <div className="space-y-4">
+                <div className="grid gap-3">
+                  {allResults.map((res, index) => (
+                    <div
+                      key={index}
+                      className={`rounded-lg border p-3 ${res.cracked ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {res.cracked ? (
+                            <X className="h-4 w-4 text-red-500" />
+                          ) : (
+                            <Check className="h-4 w-4 text-green-500" />
+                          )}
+                          <span
+                            className={`font-medium ${res.cracked ? "text-red-700" : "text-green-700"}`}
+                          >
+                            {res.wordlist}
+                          </span>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`${res.cracked ? "border-red-200 text-red-700" : "border-green-200 text-green-700"}`}
+                        >
+                          {res.cracked ? "Cracked" : "Secure"}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 text-sm text-gray-600">
+                        {res.cracked
+                          ? `Cracked in ${res.timeTaken} after ${res.attempts.toLocaleString()} attempts`
+                          : `Resisted ${res.attempts.toLocaleString()} attempts for ${res.timeTaken}`}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {showPieChart && (
+                  <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <PieChart className="h-5 w-5 text-blue-600" />
+                      <h3 className="font-medium">Password Security Summary</h3>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-4">
+                      {allResults.some((r) => r.cracked)
+                        ? "Your password was cracked by at least one wordlist. Consider using a stronger password."
+                        : "Your password resisted all cracking attempts. Good job!"}
+                    </p>
+                    <div className="flex items-center justify-center py-2">
+                      <div className="flex gap-2">
+                        <div className="flex items-center gap-1">
+                          <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                          <span className="text-xs text-gray-600">
+                            Cracked (
+                            {allResults.filter((r) => r.cracked).length})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                          <span className="text-xs text-gray-600">
+                            Secure (
+                            {allResults.filter((r) => !r.cracked).length})
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-6 text-center">
+                <p className="text-gray-500">
+                  No results yet. Test your password against wordlists to see
+                  results.
                 </p>
               </div>
             )}
-          </CardContent>
-          <CardFooter className="pt-0">
-            <div className="text-xs text-slate-500 w-full text-center">
-              This is a simulation for educational purposes only. No actual
-              password cracking is performed.
-            </div>
-          </CardFooter>
-        </Card>
-      </div>
-    </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+
+      <CardFooter className="bg-gray-50 px-6 py-4 text-sm text-gray-500">
+        <p>
+          Note: This is a simulation for educational purposes. Real password
+          cracking depends on many factors including hardware, algorithms, and
+          the actual wordlists used.
+        </p>
+      </CardFooter>
+    </Card>
   );
 };
 

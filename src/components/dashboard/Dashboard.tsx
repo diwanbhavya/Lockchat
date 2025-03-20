@@ -40,7 +40,7 @@ const Dashboard = ({
   onLogout = () => console.log("Logout clicked"),
 }: DashboardProps) => {
   const navigate = useNavigate();
-  const { updateProfile } = useAuth();
+  const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const [activeSection, setActiveSection] = useState<
     "overview" | "profile" | "chat" | "security" | "settings"
@@ -80,6 +80,15 @@ const Dashboard = ({
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   const getPasswordStrengthColor = (
     strength?: "weak" | "medium" | "strong",
   ) => {
@@ -100,7 +109,7 @@ const Dashboard = ({
       <Sidebar
         username={updatedUser.username}
         avatarUrl={updatedUser.avatarUrl}
-        onLogout={onLogout}
+        onLogout={handleLogout}
         onNavigate={handleNavigation}
       />
 
@@ -456,6 +465,7 @@ const Dashboard = ({
                 <SecureChat
                   isAuthenticated={true}
                   username={updatedUser.username}
+                  onLogout={handleLogout}
                 />
               </motion.div>
             )}

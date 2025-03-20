@@ -80,6 +80,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       await authService.logout();
       setUser(null);
+      // Redirect to login page after logout
+      window.location.href = "/login";
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An error occurred during logout",

@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Camera, Save, User } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const profileFormSchema = z.object({
   username: z.string().min(2, {
@@ -65,10 +67,13 @@ const ProfileManagement = ({
     avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=johndoe",
   },
 }: ProfileManagementProps) => {
+  const { updateProfile } = useAuth();
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(
     user.avatarUrl || null,
   );
+  const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -80,21 +85,35 @@ const ProfileManagement = ({
     },
   });
 
-  function onSubmit(data: ProfileFormValues) {
-    // In a real app, this would send the data to your backend
-    console.log("Profile updated:", data);
-    console.log("Avatar file:", avatarFile);
+  async function onSubmit(data: ProfileFormValues) {
+    try {
+      setUpdateSuccess(false);
+      setUpdateError(null);
 
-    // Save to localStorage to persist changes
-    if (avatarPreview) {
-      localStorage.setItem("userAvatar", avatarPreview);
+      // Save to localStorage to persist changes
+      if (avatarPreview) {
+        localStorage.setItem("userAvatar", avatarPreview);
+      }
+      localStorage.setItem("userFullName", data.fullName);
+      localStorage.setItem("userBio", data.bio || "");
+      localStorage.setItem("userUsername", data.username);
+      localStorage.setItem("userEmail", data.email); // Store email updates
+
+      // Update profile in auth context
+      await updateProfile({
+        username: data.username,
+        email: data.email,
+        bio: data.bio,
+        fullName: data.fullName,
+        avatarUrl: avatarPreview || undefined,
+      });
+
+      setUpdateSuccess(true);
+    } catch (error) {
+      setUpdateError(
+        error instanceof Error ? error.message : "Failed to update profile",
+      );
     }
-    localStorage.setItem("userFullName", data.fullName);
-    localStorage.setItem("userBio", data.bio || "");
-    localStorage.setItem("userUsername", data.username);
-
-    // Show success message
-    alert("Profile updated successfully!");
   }
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,6 +141,20 @@ const ProfileManagement = ({
             </p>
           </div>
         </div>
+
+        {updateSuccess && (
+          <Alert className="bg-green-50 border-green-200 text-green-800">
+            <AlertDescription>
+              Your profile has been successfully updated.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {updateError && (
+          <Alert variant="destructive">
+            <AlertDescription>{updateError}</AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Avatar Section */}
@@ -184,7 +217,7 @@ const ProfileManagement = ({
                       <FormItem>
                         <FormLabel>Full Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John Doe" {...field} />
+                          <Input placeholder="Your Name" {...field} />
                         </FormControl>
                         <FormDescription>
                           This is your full name that will be displayed to other
@@ -201,7 +234,7 @@ const ProfileManagement = ({
                       <FormItem>
                         <FormLabel>Username</FormLabel>
                         <FormControl>
-                          <Input placeholder="johndoe" {...field} />
+                          <Input placeholder="username" {...field} />
                         </FormControl>
                         <FormDescription>
                           This is your public username. It can only contain
@@ -218,10 +251,7 @@ const ProfileManagement = ({
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="john.doe@example.com"
-                            {...field}
-                          />
+                          <Input placeholder="youremail@gmail.com" {...field} />
                         </FormControl>
                         <FormDescription>
                           This is the email address associated with your

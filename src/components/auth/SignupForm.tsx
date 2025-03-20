@@ -237,7 +237,7 @@ const SignupForm = ({
                   <User className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                   <FormControl>
                     <Input
-                      placeholder="John Doe"
+                      placeholder="Your Name"
                       className="pl-10 bg-white/70 border-indigo-100 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md"
                       {...field}
                     />
@@ -261,7 +261,7 @@ const SignupForm = ({
                   <FormControl>
                     <Input
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder="youremail@gmail.com"
                       className="pl-10 bg-white/70 border-indigo-100 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md"
                       {...field}
                     />

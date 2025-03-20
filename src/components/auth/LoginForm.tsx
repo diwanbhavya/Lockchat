@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff, LogIn, Mail, Lock } from "lucide-react";
+import { Eye, EyeOff, LogIn, Mail, Lock, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -28,18 +29,25 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 interface LoginFormProps {
   onSubmit?: (values: LoginFormValues) => void;
   isLoading?: boolean;
+  error?: string | null;
 }
 
 const LoginForm = ({
   onSubmit = () => {},
   isLoading = false,
+  error = null,
 }: LoginFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(error);
   const navigate = useNavigate();
 
   const savedEmail = localStorage.getItem("rememberEmail") || "";
   const savedPassword = localStorage.getItem("rememberPassword") || "";
   const [rememberMe, setRememberMe] = useState(!!savedEmail);
+
+  useEffect(() => {
+    setLoginError(error);
+  }, [error]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -59,13 +67,9 @@ const LoginForm = ({
       localStorage.removeItem("rememberPassword");
     }
 
+    // Clear any previous errors
+    setLoginError(null);
     onSubmit(values);
-    // For demo purposes, add direct navigation if onSubmit doesn't handle it
-    setTimeout(() => {
-      if (document.location.pathname !== "/dashboard") {
-        navigate("/dashboard");
-      }
-    }, 1000);
   };
 
   const togglePasswordVisibility = () => {
@@ -84,6 +88,13 @@ const LoginForm = ({
         Welcome Back
       </h2>
 
+      {loginError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4 mr-2" />
+          <AlertDescription>{loginError}</AlertDescription>
+        </Alert>
+      )}
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5">
           <FormField
@@ -98,7 +109,7 @@ const LoginForm = ({
                   <Mail className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                   <FormControl>
                     <Input
-                      placeholder="your.email@example.com"
+                      placeholder="youremail@gmail.com"
                       type="email"
                       className="pl-10 bg-white/70 border-purple-100 focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 rounded-md"
                       {...field}

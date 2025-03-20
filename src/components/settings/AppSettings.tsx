@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardFooter } from "../ui/card";
@@ -8,13 +8,60 @@ import PasswordChange from "./PasswordChange";
 import ThemeSelector from "./ThemeSelector";
 import LanguageSelector from "./LanguageSelector";
 import { useTheme } from "@/context/ThemeContext";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckCircle } from "lucide-react";
+import { useToast } from "../ui/use-toast";
 
-const AppSettings = () => {
+interface AppSettingsProps {
+  onBack?: () => void;
+}
+
+const AppSettings = ({ onBack }: AppSettingsProps) => {
   const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
+  const [selectedTheme, setSelectedTheme] = useState(theme);
+  const [selectedLanguage, setSelectedLanguage] = useState(
+    localStorage.getItem("language") || "en",
+  );
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState("general");
+
+  const handleThemeChange = (value: string) => {
+    setSelectedTheme(value as any);
+  };
+
+  const handleLanguageChange = (value: string) => {
+    setSelectedLanguage(value);
+  };
 
   const handleSave = () => {
-    // Handle save functionality
-    console.log("Settings saved");
+    // Apply theme change
+    setTheme(selectedTheme as any);
+
+    // Apply language change
+    localStorage.setItem("language", selectedLanguage);
+
+    // Show success message
+    setSaveSuccess(true);
+
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      setSaveSuccess(false);
+    }, 3000);
+  };
+
+  const handleReset = () => {
+    // Reset to defaults
+    setSelectedTheme("default");
+    setSelectedLanguage("en");
+  };
+
+  const handleSettingsSaved = (section: string) => {
+    toast({
+      title: "Settings updated",
+      description: `Your ${section} settings have been saved successfully.`,
+      variant: "default",
+    });
   };
 
   return (
@@ -24,8 +71,15 @@ const AppSettings = () => {
       transition={{ duration: 0.5 }}
       className="container max-w-4xl mx-auto py-8"
     >
+      {saveSuccess && (
+        <Alert className="mb-4 bg-green-50 border-green-200 text-green-800">
+          <CheckCircle className="h-4 w-4 mr-2" />
+          <AlertDescription>Settings saved successfully!</AlertDescription>
+        </Alert>
+      )}
+
       <Card className="w-full shadow-lg border-0">
-        <Tabs defaultValue="general" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="general">General Settings</TabsTrigger>
             <TabsTrigger value="password">Password Settings</TabsTrigger>
@@ -36,25 +90,36 @@ const AppSettings = () => {
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Appearance</h3>
                 <div className="grid gap-4">
-                  <ThemeSelector />
+                  <ThemeSelector
+                    value={selectedTheme}
+                    onChange={handleThemeChange}
+                    onSave={() => handleSettingsSaved("appearance")}
+                  />
                 </div>
               </div>
 
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">Language</h3>
                 <div className="grid gap-4">
-                  <LanguageSelector defaultValue="en-US" width="600" />
+                  <LanguageSelector
+                    value={selectedLanguage}
+                    onChange={handleLanguageChange}
+                    onSave={() => handleSettingsSaved("language")}
+                    width="100%"
+                  />
                 </div>
               </div>
             </TabsContent>
 
             <TabsContent value="password" className="space-y-6">
-              <PasswordChange />
+              <PasswordChange onSave={() => handleSettingsSaved("password")} />
             </TabsContent>
           </CardContent>
 
           <CardFooter className="flex justify-between border-t pt-6">
-            <Button variant="outline">Reset to Defaults</Button>
+            <Button variant="outline" onClick={handleReset}>
+              Reset to Defaults
+            </Button>
             <Button
               onClick={handleSave}
               className="bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700"
