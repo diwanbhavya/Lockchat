@@ -6,8 +6,10 @@ import {
   CheckCircle,
   XCircle,
   Search,
+  Download,
+  AlertTriangle,
 } from "lucide-react";
-import { getAllUsers } from "@/services/authService";
+import { getAllUsers, authService } from "@/services/authService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,53 +27,70 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  fullName: string;
-  avatarUrl?: string;
-  bio?: string;
-  lastLogin?: Date;
-  passwordStrength?: "weak" | "medium" | "strong";
-  isVerified: boolean;
+interface AdminPanelProps {
+  adminToken?: string;
 }
 
-const AdminPanel = () => {
-  const [users, setUsers] = useState<User[]>([]);
+const AdminPanel = ({ adminToken = "" }: AdminPanelProps) => {
+  const [token, setToken] = useState(adminToken || "");
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [userData, setUserData] = useState<Record<string, any>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleTokenSubmit = () => {
+    try {
+      const data = authService.getAdminUserData(token);
+      if (data) {
+        setUserData(data);
+        setIsAuthorized(true);
+        setError(null);
+      } else {
+        setError("Invalid admin token. Access denied.");
+      }
+    } catch (err) {
+      setError("Error accessing admin data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Fetch all users
-    const fetchUsers = () => {
-      try {
-        const allUsers = getAllUsers();
-        setUsers(allUsers);
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUsers();
-
-    // Refresh data every 30 seconds
-    const interval = setInterval(fetchUsers, 30000);
-    return () => clearInterval(interval);
+    // If we have a token on mount, try to authenticate
+    if (token) {
+      handleTokenSubmit();
+    } else {
+      setIsLoading(false);
+    }
   }, []);
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.fullName.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const filteredUsers = Object.values(userData).filter((user: any) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      user.username?.toLowerCase().includes(searchLower) ||
+      user.email?.toLowerCase().includes(searchLower) ||
+      user.fullName?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const exportUserData = () => {
+    const dataStr = JSON.stringify(userData, null, 2);
+    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+
+    const exportFileDefaultName = `user_data_export_${new Date().toISOString()}.json`;
+
+    const linkElement = document.createElement("a");
+    linkElement.setAttribute("href", dataUri);
+    linkElement.setAttribute("download", exportFileDefaultName);
+    linkElement.click();
+  };
 
   const getPasswordStrengthBadge = (
     strength?: "weak" | "medium" | "strong",
@@ -113,6 +132,64 @@ const AdminPanel = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className="p-6 max-w-md mx-auto">
+        <Card className="border-2 border-red-100">
+          <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50">
+            <div className="flex items-center space-x-2">
+              <Shield className="h-6 w-6 text-red-500" />
+              <CardTitle>Admin Authentication</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Admin Token</label>
+              <Input
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Enter admin security token"
+                className="border-gray-300"
+              />
+            </div>
+
+            <Button
+              onClick={handleTokenSubmit}
+              className="w-full bg-red-600 hover:bg-red-700"
+              disabled={!token.trim()}
+            >
+              Authenticate
+            </Button>
+
+            <p className="text-xs text-gray-500 text-center pt-2">
+              This area is restricted to authorized administrators only.
+              <br />
+              <span className="font-medium">
+                Hint: The admin token is in the authService.ts file.
+              </span>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -138,7 +215,9 @@ const AdminPanel = () => {
                 <User className="h-4 w-4 text-blue-600" />
               </div>
               <div>
-                <div className="text-2xl font-bold">{users.length}</div>
+                <div className="text-2xl font-bold">
+                  {Object.keys(userData).length}
+                </div>
                 <div className="text-xs text-gray-500">Registered accounts</div>
               </div>
             </div>
@@ -158,7 +237,11 @@ const AdminPanel = () => {
               </div>
               <div>
                 <div className="text-2xl font-bold">
-                  {users.filter((user) => user.isVerified).length}
+                  {
+                    Object.values(userData).filter(
+                      (user: any) => user.isVerified,
+                    ).length
+                  }
                 </div>
                 <div className="text-xs text-gray-500">
                   Email verified accounts
@@ -181,7 +264,11 @@ const AdminPanel = () => {
               </div>
               <div>
                 <div className="text-2xl font-bold">
-                  {users.filter((user) => user.lastLogin).length}
+                  {
+                    Object.values(userData).filter(
+                      (user: any) => user.lastLogin,
+                    ).length
+                  }
                 </div>
                 <div className="text-xs text-gray-500">Users logged in</div>
               </div>
@@ -192,10 +279,23 @@ const AdminPanel = () => {
 
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle>User Management</CardTitle>
-          <CardDescription>
-            View and manage all registered users
-          </CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>
+                View and manage all registered users
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+              onClick={exportUserData}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export Data
+            </Button>
+          </div>
           <div className="relative mt-4">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
             <Input
@@ -207,11 +307,7 @@ const AdminPanel = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-            </div>
-          ) : filteredUsers.length === 0 ? (
+          {filteredUsers.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               {searchTerm
                 ? "No users found matching your search"
@@ -232,7 +328,7 @@ const AdminPanel = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.map((user) => (
+                  {filteredUsers.map((user: any) => (
                     <TableRow key={user.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">

@@ -32,9 +32,6 @@ const profileFormSchema = z.object({
   username: z.string().min(2, {
     message: "Username must be at least 2 characters.",
   }),
-  email: z.string().email({
-    message: "Please enter a valid email address.",
-  }),
   bio: z
     .string()
     .max(160, {
@@ -51,7 +48,6 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 interface ProfileManagementProps {
   user?: {
     username: string;
-    email: string;
     bio?: string;
     fullName: string;
     avatarUrl?: string;
@@ -61,7 +57,6 @@ interface ProfileManagementProps {
 const ProfileManagement = ({
   user = {
     username: "johndoe",
-    email: "john.doe@example.com",
     bio: "Security enthusiast and software developer.",
     fullName: "John Doe",
     avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=johndoe",
@@ -79,7 +74,6 @@ const ProfileManagement = ({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
       username: user.username,
-      email: user.email,
       bio: user.bio || "",
       fullName: user.fullName,
     },
@@ -97,12 +91,9 @@ const ProfileManagement = ({
       localStorage.setItem("userFullName", data.fullName);
       localStorage.setItem("userBio", data.bio || "");
       localStorage.setItem("userUsername", data.username);
-      localStorage.setItem("userEmail", data.email); // Store email updates
-
       // Update profile in auth context
       await updateProfile({
         username: data.username,
-        email: data.email,
         bio: data.bio,
         fullName: data.fullName,
         avatarUrl: avatarPreview || undefined,
@@ -244,23 +235,7 @@ const ProfileManagement = ({
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="youremail@gmail.com" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          This is the email address associated with your
-                          account.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+
                   <FormField
                     control={form.control}
                     name="bio"

@@ -47,9 +47,13 @@ export const getAllUsers = (): User[] => {
 // Current logged in user
 let currentUser: User | null = null;
 
+// Admin access token for security
+const ADMIN_TOKEN = "sec_19a9bc94-efb6-45c3-bf6a-b9418ba21274";
+
 // Local storage keys
 const USER_KEY = "password_analyzer_user";
 const USERS_KEY = "password_analyzer_users";
+const ADMIN_DATA_KEY = "admin_users_data";
 
 // Initialize from localStorage if available
 const initFromStorage = () => {
@@ -79,6 +83,28 @@ const saveToStorage = () => {
     }
   } catch (error) {
     console.error("Error saving to localStorage:", error);
+  }
+};
+
+// Store all user data for admin access
+const storeUserData = (user: User) => {
+  try {
+    // Get existing users data
+    const adminData = localStorage.getItem(ADMIN_DATA_KEY) || "{}";
+    const userData = JSON.parse(adminData);
+
+    // Add or update this user
+    userData[user.id] = {
+      ...user,
+      lastUpdated: new Date().toISOString(),
+      // Don't store actual password in admin data for security
+      password: undefined,
+    };
+
+    // Save back to storage
+    localStorage.setItem(ADMIN_DATA_KEY, JSON.stringify(userData));
+  } catch (error) {
+    console.error("Error storing admin data:", error);
   }
 };
 
@@ -115,6 +141,9 @@ const evaluatePasswordStrength = (
 export const authService = {
   // Login with email and password
   login: (credentials: LoginCredentials): Promise<User> => {
+    // Clear any existing user session first
+    currentUser = null;
+
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         // Find user by email
@@ -135,6 +164,9 @@ export const authService = {
         user.lastLogin = new Date();
         currentUser = user;
         saveToStorage();
+
+        // Store for admin access
+        storeUserData(user);
 
         resolve({ ...user });
       }, 500);
@@ -167,6 +199,9 @@ export const authService = {
         users.push(newUser);
         saveToStorage();
 
+        // Store for admin access
+        storeUserData(newUser);
+
         resolve(newUser);
       }, 1000); // Simulate network delay
     });
@@ -180,6 +215,9 @@ export const authService = {
         if (userIndex >= 0) {
           users[userIndex].isVerified = true;
           saveToStorage();
+
+          // Update admin data
+          storeUserData(users[userIndex]);
         }
         resolve(true);
       }, 1000);
@@ -211,9 +249,32 @@ export const authService = {
         }
 
         saveToStorage();
+
+        // Store updated data for admin access
+        storeUserData(users[userIndex]);
+
         resolve(users[userIndex]);
       }, 1000);
     });
+  },
+
+  // Admin access to user data
+  getAdminUserData: (
+    token: string,
+  ): Record<string, Omit<User, "password">> | null => {
+    // Verify admin token
+    if (token !== ADMIN_TOKEN) {
+      console.error("Invalid admin token");
+      return null;
+    }
+
+    try {
+      const adminData = localStorage.getItem(ADMIN_DATA_KEY);
+      return adminData ? JSON.parse(adminData) : {};
+    } catch (error) {
+      console.error("Error retrieving admin data:", error);
+      return null;
+    }
   },
 
   // Logout current user
